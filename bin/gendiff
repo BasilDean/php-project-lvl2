@@ -2,14 +2,28 @@
 
 <?php
 
-use function GenDiff\GenDiff\run;
+//require __DIR__.'/../vendor/docopt/docopt/src/docopt.php';
+require_once __DIR__ . '/../src/autoload.php';
 
-$autoloadPath1 = __DIR__ . '/../../../autoload.php';
-$autoloadPath2 = __DIR__ . '/../vendor/autoload.php';
-if (file_exists($autoloadPath1)) {
-    require_once $autoloadPath1;
-} else {
-    require_once $autoloadPath2;
+use function Differ\GenDiff\genDiff;
+
+$doc = <<<'DOCOPT'
+Usage:
+    gendiff (-h| --help)
+    gendiff (-v| --version)
+    gendiff [--format <fmt>] [<firstFile>] [<secondFile>]
+Options:
+    -h             show this screen
+    -v --version   show version
+    --format <fmt> Report format [default: pretty]
+DOCOPT;
+
+$dataForDiff = Docopt::handle($doc, array('version' => '1.0.0rc2'));
+
+/*foreach ($dataForDiff as $k=>$v) {
+    echo $k.': '.json_encode($v).PHP_EOL;
+}*/
+if ($dataForDiff['<firstFile>'] != null && $dataForDiff['<secondFile>'] != null) {
+    $diff = genDiff([$dataForDiff['<firstFile>'], $dataForDiff['<secondFile>']]);
+    print_r($diff . PHP_EOL);
 }
-
-run();
