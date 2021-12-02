@@ -1,6 +1,6 @@
 <?php
 
-namespace  Differ\Differ\Tests;
+namespace Differ;
 
 use PHPUnit\Framework\TestCase;
 
@@ -8,35 +8,38 @@ use function Differ\Differ\genDiff;
 
 class DifferTest extends TestCase
 {
-    public function addDataProvider()
+    public function testGenDiffYamlFormat(): void
     {
-        return [
-            ['before.json', 'after.json', 'stylish', 'diffStylish'],
-            ['before.yml', 'after.yml', 'stylish', 'diffStylish'],
-            ['before.json', 'after.json', 'plain', 'diffPlain'],
-            ['before.yml', 'after.yml', 'plain', 'diffPlain'],
-            ['before.json', 'after.json', 'json', 'diffJson'],
-            ['before.yml', 'after.yml', 'json', 'diffJson']
-        ];
+        $expectant = __DIR__ . "/fixtures/testGenDiffYamlFormat";
+        $pathToFirstFile = __DIR__ . "/fixtures/firstFile.yaml";
+        $pathToSecondFile = __DIR__ . "/fixtures/secondFile.yml";
+
+        $this->assertStringEqualsFile($expectant, genDiff($pathToFirstFile, $pathToSecondFile));
     }
 
-    /**
-     * @dataProvider addDataProvider
-     */
-    
-    public function testGenDiff($nameBefore, $nameAfter, $format, $nameResult)
+    public function testGenDiffJsonFormat(): void
     {
-        $pathToFile1 = $this->genPath($nameBefore);
-        $pathToFile2 = $this->genPath($nameAfter);
-        $pathToExpected = $this->genPath($nameResult);
-        $actual = genDiff($pathToFile1, $pathToFile2, $format);
-        $expected = file_get_contents($pathToExpected);
-        $this->assertEquals($expected, $actual);
+        $expectant = __DIR__ . "/fixtures/testGenDiffJsonFormat";
+        $pathToFirstFile = __DIR__ . "/fixtures/firstFile.json";
+        $pathToSecondFile = __DIR__ . "/fixtures/secondFile.json";
+        $this->assertStringEqualsFile($expectant, genDiff($pathToFirstFile, $pathToSecondFile, 'stylish'));
     }
 
-    private function genPath($baseName)
+    public function testGenDiffPlain(): void
     {
-        $dir = '__fixtures__';
-        return "./{$dir}/{$baseName}";
+        $expectant = __DIR__ . "/fixtures/testGenDiffPlain";
+        $pathToFirstFile = __DIR__ . "/fixtures/firstFile.yaml";
+        $pathToSecondFile = __DIR__ . "/fixtures/secondFile.yml";
+        $this->assertStringEqualsFile($expectant, genDiff($pathToFirstFile, $pathToSecondFile, "plain"));
+    }
+
+    public function testGenDiffJson(): void
+    {
+        $fileJson = __DIR__ . "/fixtures/testGenDiffJson";
+        $expectant = file_get_contents($fileJson);
+
+        $pathToFirstFile = __DIR__ . "/fixtures/firstFile.yaml";
+        $pathToSecondFile = __DIR__ . "/fixtures/secondFile.yml";
+        $this->assertEquals($expectant, genDiff($pathToFirstFile, $pathToSecondFile, "json"));
     }
 }

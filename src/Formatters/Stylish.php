@@ -1,65 +1,65 @@
 <?php
 
-namespace  Differ\Formatters\Stylish;
+namespace Differ\Formatters\Stylish;
 
-use function Differ\Tree\getType;
-use function Differ\Tree\getName;
-use function Differ\Tree\getOldValue;
-use function Differ\Tree\getNewValue;
-use function Differ\Tree\getChildren;
-use function Differ\Preparation\boolToString;
-use function Funct\Collection\flattenAll;
-
-function iter($tree, $space)
+function getStylishFormat(array $data): string
 {
-    $addedSpace = '    ';
-    $result = array_reduce($tree, function ($res, $node) use ($space, $addedSpace) {
-        $type = getType($node);
-        $name = getName($node);
-        switch ($type) {
-            case 'added':
-                $newValue = getNewValue($node);
-                $res[] = $space . "  + {$name}: " . prepareValue($newValue, $space . $addedSpace);
-                break;
-            case 'removed':
-                $oldValue = getOldValue($node);
-                $res[] = $space . "  - {$name}: " . prepareValue($oldValue, $space . $addedSpace);
-                break;
-            case 'notChanged':
-                $newValue = getNewValue($node);
-                $res[] = $space . "    {$name}: " . prepareValue($newValue, $space . $addedSpace);
-                break;
-            case 'updated':
-                $oldValue = getOldValue($node);
-                $newValue = getNewValue($node);
-                $res[] = $space . "  - {$name}: " . prepareValue($oldValue, $space . $addedSpace);
-                $res[] = $space . "  + {$name}: " . prepareValue($newValue, $space . $addedSpace);
-                break;
-            case 'nested':
-                $children = getChildren($node);
-                $res[] = $space . "    {$name}: {";
-                $res[] = iter($children, $space . $addedSpace);
-                $res[] = $space . '    }';
-        };
-        return $res;
-    }, []);
-    return flattenAll($result);
+    return "{\n" . implode("\n", getDiff($data)) . "\n}";
 }
 
-function stylish($tree)
+function getDiff(array $data, string $space = ""): array
 {
-    $res = implode("\n", iter($tree, ''));
-    return "{\n" . $res . "\n}\n";
+    return array_map(fn ($node) => getFormat($node, $space), $data);
 }
 
-function prepareValue($value, $space = '')
+function getFormat(array $node, string $space): string
 {
-    if (!is_object($value)) {
-        return boolToString($value);
+    $ident = ['unchanged' => '    ', 'added' => '  + ', 'removed' => '  - '];
+    $newSpace = $space . "    ";
+    switch ($node['status']) {
+        case 'unchanged':
+        case 'added':
+        case 'removed':
+            $value = $node['status'] === 'removed' ? $node['oldValue'] : $node['newValue'];
+            $status = $space . $ident[$node['status']];
+            return is_array($value)
+            ? getArrayFormat($value, $node['key'], $status, $newSpace)
+            : "{$status}{$node['key']}: " . displayValue($value);
+
+        case 'updated':
+            $oldValue = is_array($node['oldValue'])
+            ? getArrayFormat($node['oldValue'], $node['key'], $space . $ident['removed'], $newSpace)
+            : $space . $ident['removed'] . "{$node['key']}: " . displayValue($node['oldValue']);
+
+            $newValue = is_array($node['newValue'])
+            ? getArrayFormat($node['newValue'], $node['key'], $space . $ident['added'], $newSpace)
+            : $space . $ident['added'] . "{$node['key']}: " . displayValue($node['newValue']);
+
+            return $oldValue . "\n" . $newValue;
+
+        case "parent":
+            $children = getDiff($node['children'], $newSpace);
+            return $newSpace . $node['key'] . ": {\n" . implode("\n", $children) . "\n" . $newSpace . "}";
+        default:
+            throw new \Exception("unknown status: " . $node['status'] . " for getFormat in Plain format");
     }
-    $arr = (array) ($value);
-    $res = implode('', array_map(function ($key, $value) use ($space) {
-        return "\n" . $space . "    {$key}: " . prepareValue($value, $space . '    ');
-    }, array_keys($arr), $arr));
-    return '{' . $res . "\n" . $space . '}';
+}
+
+function getArrayFormat(array $value, string $key, string $status, string $space): string
+{
+    $newSpace = $space . "    ";
+    $children = array_map(fn ($key) => is_array($value[$key])
+        ? getArrayFormat($value[$key], $key, $newSpace, $newSpace)
+        : $newSpace . $key . ": " . $value[$key], array_keys($value));
+
+    return $status . $key . ": {\n" . implode("\n", $children) . "\n" . $space . "}";
+}
+
+function displayValue(mixed $value): string
+{
+    if (is_bool($value)) {
+        return ($value === true) ? "true" : "false";
+    }
+
+    return is_null($value) ? "null" : $value;
 }

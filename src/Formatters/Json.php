@@ -1,8 +1,12 @@
 <?php
 
-namespace  Differ\Formatters\Json;
+namespace Differ\Formatters\Json;
 
-function json($tree)
+function getJsonFormat(array $data): string
 {
-    return json_encode($tree, JSON_PRETTY_PRINT);
+    $json = json_encode($data);
+    if ($json === false) {
+        throw new \Exception("Can't convert to json");
+    }
+    return $json;
 }

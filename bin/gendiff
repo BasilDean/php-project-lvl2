@@ -1,8 +1,5 @@
 #!/usr/bin/env php
-
 <?php
-
-use function Differ\Differ\genDiff;
 
 $autoloadPath1 = __DIR__ . '/../../../autoload.php';
 $autoloadPath2 = __DIR__ . '/../vendor/autoload.php';
@@ -12,7 +9,11 @@ if (file_exists($autoloadPath1)) {
     require_once $autoloadPath2;
 }
 
-$doc = <<<'DOCOPT'
+use function Differ\Differ\genDiff;
+
+const VERSION = "1.3";
+
+$doc = <<<DOC
 Generate diff
 
 Usage:
@@ -24,13 +25,9 @@ Options:
   -h --help                     Show this screen
   -v --version                  Show version
   --format <fmt>                Report format [default: stylish]
-  
-DOCOPT;
+DOC;
 
-$result = \Docopt::handle($doc, array('version'=>'1.0.0'));
+$options = Docopt::handle($doc, array('version' => VERSION));
 
-$path1 = realpath($result["<firstFile>"]);
-$path2 = realpath($result["<secondFile>"]);
-$format = $result["--format"];
-
-print_r (genDiff($path1, $path2, $format));
+print_r(genDiff($options["<firstFile>"], $options["<secondFile>"], $options["--format"]));
+print_r("\n");

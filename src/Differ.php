@@ -1,32 +1,78 @@
 <?php
 
-namespace  Differ\Differ;
+namespace Differ\Differ;
 
-use function Differ\Parsers\parse;
-use function Differ\Builder\diffAsTree;
-use function Differ\Formatters\Stylish\stylish;
-use function Differ\Formatters\Plain\plain;
-use function Differ\Formatters\Json\json;
+use function Differ\Parsers\parsers;
+use function Differ\Formatters\formatters;
+use function Functional\sort;
 
-function genDiff($pathToFile1, $pathToFile2, $format = 'stylish')
+function genDiff(string $firstFile, string $secondFile, string $format = 'stylish'): string
 {
-    $data1 = getData($pathToFile1);
-    $data2 = getData($pathToFile2);
-        
-    $mapping = [
-        'stylish' =>
-            fn($tree) => stylish($tree),
-        'plain' =>
-            fn($tree) => plain($tree),
-        'json' =>
-            fn($tree) => json($tree),
-    ];
-    return $mapping[$format](diffAsTree($data1, $data2));
+
+    [$contentFirstFile, $typeFirstFile] = getData($firstFile);
+    [$contentSecondFile, $typeSecondFile] = getData($secondFile);
+
+    $oldData = parsers($contentFirstFile, $typeFirstFile);
+    $newData = parsers($contentSecondFile, $typeSecondFile);
+
+    $ast = getAst($oldData, $newData);
+    return formatters($ast, $format);
 }
 
-function getData($pathToFile)
+function getData(string $file): array
 {
-    $type = pathinfo($pathToFile, PATHINFO_EXTENSION);
-    $rawData = file_get_contents($pathToFile);
-    return parse($rawData, $type);
+    $content = file_get_contents($file);
+    if ($content === false) {
+        throw new \Exception("Can't read file: {$file}");
+    }
+    $type = pathinfo($file, PATHINFO_EXTENSION);
+    return [$content, $type];
+}
+
+function getAst(array $oldData, array $newData): array
+{
+    $keys = array_keys(array_merge($oldData, $newData));
+    $sortKeys = sort($keys, fn ($oldData, $newData) => $oldData <=> $newData);
+
+    return array_map(function ($key) use ($oldData, $newData) {
+
+        $oldValue = array_key_exists($key, $oldData) ? $oldData[$key] : 'not exist';
+        $newValue = array_key_exists($key, $newData) ? $newData[$key] : 'not exist';
+
+        if (is_array($oldValue) && is_array($newValue)) {
+            $children = getAst($oldValue, $newValue);
+            return [
+                'key' => $key,
+                'status' => 'parent',
+                'children' => $children
+            ];
+        }
+        return[
+            'key' => $key,
+            'oldValue' => $oldValue,
+            'newValue' => $newValue,
+            'status' => getStatusObject($oldValue, $newValue)
+        ];
+    }, $sortKeys);
+}
+
+function getStatusObject(mixed $oldData, mixed $newData): string
+{
+    if ($oldData === $newData) {
+        return "unchanged";
+    }
+
+    if ($oldData === "not exist" && $newData !== "not exist") {
+        return "added";
+    }
+
+    if ($oldData !== "not exist" && $newData === "not exist") {
+        return "removed";
+    }
+
+    if ($oldData !== "not exist" && $newData !== "not exist") {
+        return "updated";
+    }
+
+    return throw new \Exception("unknown status for: {$oldData} and {$newData} for getStatusObject in Differ");
 }

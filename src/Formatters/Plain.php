@@ -1,52 +1,52 @@
 <?php
 
-namespace  Differ\Formatters\Plain;
+namespace Differ\Formatters\Plain;
 
-use function Differ\Tree\getType;
-use function Differ\Tree\getName;
-use function Differ\Tree\getOldValue;
-use function Differ\Tree\getNewValue;
-use function Differ\Tree\getChildren;
-use function Differ\Preparation\boolToString;
-use function Funct\Collection\flattenAll;
-
-function iter($tree, $preName)
+function getPlainFormat(array $data): string
 {
-    $result = array_reduce($tree, function ($res, $node) use ($preName) {
-        $type = getType($node);
-        $name = $preName . getName($node);
-        switch ($type) {
-            case 'added':
-                $newValue = prepareValue(getNewValue($node));
-                $res[] = "Property '{$name}' was {$type} with value: {$newValue}";
-                break;
-            case 'removed':
-                $res[] = "Property '{$name}' was {$type}";
-                break;
-            case 'notChanged':
-                break;
-            case 'updated':
-                $oldValue = prepareValue(getOldValue($node));
-                $newValue = prepareValue(getNewValue($node));
-                $res[] = "Property '{$name}' was {$type}. From {$oldValue} to {$newValue}";
-                break;
-            case 'nested':
-                $children = getChildren($node);
-                $res[] = iter($children, $name . '.');
-        };
-        return $res;
-    }, []);
-    return flattenAll($result);
+    return implode("\n", getDiff($data));
 }
 
-function plain($tree)
+function getDiff(array $data, string $path = ''): array
 {
-    return implode("\n", iter($tree, ''));
+    $result = array_map(fn ($node) => getFormat($node, $path), $data);
+
+    return array_filter($result, fn ($name) => !is_null($name));
 }
 
-function prepareValue($value)
+function getFormat(array $node, string $path): string | null
 {
-    $preparedValue = is_string($value) ? "'{$value}'" : boolToString($value);
-    $preparedValue = is_object($preparedValue) ? '[complex value]' : $preparedValue;
-    return $preparedValue;
+    $newPath = $path == "" ? $node['key'] : "{$path}.{$node['key']}";
+    switch ($node['status']) {
+        case 'unchanged':
+            return null;
+        case 'added':
+            return "Property '{$newPath}' was added with value: " . displayValue($node['newValue']);
+        case 'removed':
+            return "Property '{$newPath}' was removed";
+        case 'updated':
+            return "Property '{$newPath}' was updated. From "
+            . displayValue($node['oldValue']) . " to " . displayValue($node['newValue']);
+        case "parent":
+            return implode("\n", getDiff($node['children'], $newPath));
+        default:
+            throw new \Exception("unknown status: " . $node['status'] . " for getFormat in Plain format");
+    }
+}
+
+function displayValue(mixed $value): string | int | float
+{
+    if (is_bool($value)) {
+        return ($value === true) ? "true" : "false";
+    }
+
+    if (is_numeric($value)) {
+        return $value;
+    }
+
+    if (is_null($value)) {
+        return "null";
+    }
+
+    return is_array($value) ? '[complex value]' : "'$value'";
 }
