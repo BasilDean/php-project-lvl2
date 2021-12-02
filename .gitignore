@@ -1,1 +1,6 @@
 /vendor/
+/.idea/
+*.swo
+*.swp
+*.cache
+build
